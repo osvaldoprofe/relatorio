@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS public.reports (
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- 3. Criar Políticas de Acesso
--- Para este projeto, como não há autenticação complexa implementada ainda, 
--- permitiremos acesso total para fins de demonstração (ou ajuste conforme sua necessidade de login)
+-- Remove políticas existentes para evitar erros de duplicidade
+DROP POLICY IF EXISTS "Permitir leitura pública de relatórios" ON public.reports;
+DROP POLICY IF EXISTS "Permitir inserção pública de relatórios" ON public.reports;
+DROP POLICY IF EXISTS "Permitir exclusão pública de relatórios" ON public.reports;
 
 -- Política para Leitura (Select)
 CREATE POLICY "Permitir leitura pública de relatórios" 

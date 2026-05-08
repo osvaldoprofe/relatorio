@@ -16,25 +16,27 @@ function getAI() {
 export async function generateReport(transcript: string, audioData?: { base64: string; mimeType: string }): Promise<string> {
   const ai = getAI();
   const prompt = `Você é um assistente especializado em Orientação Educacional e Apoio Pedagógico na Escola Estadual Frederico J. P. Neto.
-Sua tarefa é ler transcrições de relatos verbais enviados pelo orientador, extrair as informações relevantes e preencher o "Relatório Técnico – Equipe Multiprofissional".
+Sua tarefa é ler transcrições de relatos verbais enviados pelo orientador, extrair as informações relevantes e preencher o "RELATÓRIO TÉCNICO – EQUIPE MULTIPROFISSIONAL".
 
-Objetivo: Transformar relatos brutos em um texto estruturado, profissional e direto, seguindo fielmente a organização do documento padrão.
+Objetivo: Transformar relatos brutos em um texto estruturado, profissional e direto, seguindo fielmente a organização do documento padrão da escola.
 
 Diretrizes Gerais:
 - Seja claro, sucinto e direto.
 - Utilize linguagem formal técnica adequada ao ambiente escolar.
-- Caso alguma informação de identificação (como CPF, celular, etc) não seja dita na transcrição, deixe o campo exatamente como "__________________" para preenchimento manual.
-- O formato de saída NÃO DEVE conter marcações Markdown fortes (como hashtags # para títulos) que prejudiquem a cópia limpa para um documento Word. Use quebras de linha normais e mantenha a numeração romana conforme especificado.
+- Siga exatamente o layout e campos do formulário oficial.
+- Caso alguma informação de identificação não seja dita na transcrição, deixe o campo exatamente como "__________________" para preenchimento manual.
+- NÃO use negritos (**) em excesso, use apenas para os títulos das seções.
 
-Estrutura de Saída (Siga rigorosamente esta ordem e formato):
+ESTRUTURA DE SAÍDA (Siga rigorosamente este layout):
+
+RELATÓRIO TÉCNICO – EQUIPE MULTIPROFISSIONAL
 
 I – IDENTIFICAÇÃO
-Nome do estudante: [nome do estudante ou __________________]
-Idade: [idade ou __________________]
-Turma: [turma descrita ou __________________]
-Turno: [turno ou __________________]
-CPF: __________________
-Celular: __________________
+ESTUDANTE (A): [nome do estudante ou __________________] IDADE: [idade ou ________]
+TURMA: [turma ou __________] TURNO: [turno ou ___________________] CELULAR: [celular ou ___________________________]
+RESPONSÁVEL 1: [nome ou __________________________________________] CELULAR: [celular ou ______________]
+RESPONSÁVEL 2: [nome ou __________________________________________] CELULAR: [celular ou ______________]
+Data: ${new Date().toLocaleDateString('pt-BR')} Horário: [horário ou _____________]
 
 II – DESCRIÇÃO DA DEMANDA
 [Resuma o motivo do atendimento ou a queixa principal relatada de forma objetiva.]
@@ -52,28 +54,32 @@ ATENÇÃO (Conhecimentos Prévios Injetados):
 V – PARECER TÉCNICO
 [Apresente uma conclusão técnica ou recomendações pedagógicas com tom formal e de orientação, sugerindo passos futuros baseados no cenário relatado.]
 
-Data de Geração: ${new Date().toLocaleDateString('pt-BR')}
+ORIENTAÇÃO EDUCACIONAL: _____________________________________________________
+PSICÓLOGA (A):____________________________________________________________________
+ASSISTENTE SOCIAL: _____________________________________________________________
+RESPONSÁVEL: __________________________________________________________________
+ESTUDANTE:_____________________________________________________________________
 
 Aqui está o relato a ser processado:
 """
 ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra no áudio enviado." : "")}
 """`;
 
-  const contents: any[] = [];
+  const parts: any[] = [];
   if (audioData) {
-    contents.push({
+    parts.push({
       inlineData: {
         data: audioData.base64,
         mimeType: audioData.mimeType
       }
     });
   }
-  contents.push({ text: prompt });
+  parts.push({ text: prompt });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: contents,
+      contents: [{ parts }],
     });
     return response.text || '';
   } catch (err) {

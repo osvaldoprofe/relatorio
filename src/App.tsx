@@ -216,12 +216,12 @@ export default function App() {
       return;
     }
 
-    const matchName = reportText.match(/Nome do estudante:\s*(.*?)(?=\n|$)/);
+    const matchName = reportText.match(/ESTUDANTE \(A\):\s*(.*?)(?=\s*IDADE:|$|\n)/i);
     const name = matchName && matchName[1] && matchName[1].trim() !== '__________________' 
       ? matchName[1].trim() 
       : 'Não identificado';
 
-    const matchClass = reportText.match(/Turma:\s*(.*?)(?=\n|$)/);
+    const matchClass = reportText.match(/TURMA:\s*(.*?)(?=\s*TURNO:|$|\n)/i);
     const studentClass = matchClass && matchClass[1] && matchClass[1].trim() !== '__________________' 
       ? matchClass[1].trim() 
       : 'Não identificada';
