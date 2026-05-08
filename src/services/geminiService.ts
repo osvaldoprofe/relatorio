@@ -1,10 +1,21 @@
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
+let genAI: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!genAI) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      throw new Error('Chave de API do Gemini não encontrada. Configure a variável GEMINI_API_KEY no ambiente.');
+    }
+    genAI = new GoogleGenAI({ apiKey });
+  }
+  return genAI;
+}
 
 export async function generateReport(transcript: string, audioData?: { base64: string; mimeType: string }): Promise<string> {
+  const ai = getAI();
+  const model = ai.getGenerativeModel({ model: 'gemini-1.5-pro' });
   const prompt = `Você é um assistente especializado em Orientação Educacional e Apoio Pedagógico na Escola Estadual Frederico J. P. Neto.
 Sua tarefa é ler transcrições de relatos verbais enviados pelo orientador, extrair as informações relevantes e preencher o "Relatório Técnico – Equipe Multiprofissional".
 
@@ -61,11 +72,9 @@ ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra 
   contents.push({ text: prompt });
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro', // Using a larger model for reasoning nuances
-      contents: contents,
-    });
-    return response.text || '';
+    const result = await model.generateContent(contents);
+    const response = await result.response;
+    return response.text() || '';
   } catch (err) {
     console.error("Gemini Error:", err);
     throw new Error('Falha ao processar o relatório via IA. Verifique sua conexão e tente novamente.');

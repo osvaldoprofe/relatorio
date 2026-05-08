@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, FileText, Copy, Check, Loader2, School, AlertCircle, Trash2, Printer, History, Save, X, Search, Calendar, Upload, FileAudio, ChevronLeft, FileDown } from 'lucide-react';
+import { Mic, Square, FileText, Copy, Check, Loader2, School, AlertCircle, Trash2, Printer, History, Save, X, Search, Calendar, Upload, FileAudio, ChevronLeft, FileDown, Loader } from 'lucide-react';
 import { generateReport } from './services/geminiService';
 import { jsPDF } from 'jspdf';
+import { supabase } from './lib/supabase';
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -23,11 +24,13 @@ export default function App() {
   
   const [history, setHistory] = useState<SavedReport[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recognitionRef = useRef<any>(null);
@@ -52,15 +55,42 @@ export default function App() {
     }
   }, [reportText]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('reportsHistory');
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to parse history', e);
-      }
+  // Carregar histórico do Supabase
+  const loadSupabaseHistory = async () => {
+    if (!supabase) {
+      console.warn('Supabase não configurado. Histórico no banco de dados desabilitado.');
+      return;
     }
+    
+    setIsHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const transformed: SavedReport[] = data.map(item => ({
+          id: item.id,
+          date: item.created_at,
+          studentName: item.student_name,
+          studentClass: item.student_class,
+          content: item.content
+        }));
+        setHistory(transformed);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico:', err);
+      setErrorMsg('Não foi possível carregar o histórico do banco de dados.');
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSupabaseHistory();
   }, []);
 
   useEffect(() => {
@@ -178,8 +208,13 @@ export default function App() {
     }
   };
 
-  const handleSaveReport = () => {
+  const handleSaveReport = async () => {
     if (!reportText) return;
+    
+    if (!supabase) {
+      setErrorMsg('O banco de dados não está configurado. Verifique as chaves VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
+      return;
+    }
 
     const matchName = reportText.match(/Nome do estudante:\s*(.*?)(?=\n|$)/);
     const name = matchName && matchName[1] && matchName[1].trim() !== '__________________' 
@@ -191,34 +226,58 @@ export default function App() {
       ? matchClass[1].trim() 
       : 'Não identificada';
 
-    const newReport: SavedReport = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      studentName: name,
-      studentClass: studentClass,
-      content: reportText
-    };
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .insert({
+          student_name: name,
+          student_class: studentClass,
+          content: reportText
+        });
 
-    const updatedHistory = [newReport, ...history];
-    setHistory(updatedHistory);
-    localStorage.setItem('reportsHistory', JSON.stringify(updatedHistory));
-    
-    setHasUnsavedChanges(false);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
-    
-    // Opcional: Limpar campos após salvar se desejar (o usuário pediu para excluir o áudio, o que já foi feito)
-    setTranscript('');
-    setAudioFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      if (error) throw error;
+
+      // Recarregar histórico após salvar
+      await loadSupabaseHistory();
+
+      setHasUnsavedChanges(false);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+      
+      setTranscript('');
+      setAudioFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      console.error('Erro ao salvar:', err);
+      setErrorMsg('Falha ao salvar no banco de dados Supabase.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteHistory = (id: string, e: React.MouseEvent) => {
+  const handleDeleteHistory = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Tem certeza que deseja excluir este relatório do histórico?')) {
-       const updated = history.filter((r) => r.id !== id);
-       setHistory(updated);
-       localStorage.setItem('reportsHistory', JSON.stringify(updated));
+    
+    if (!supabase) {
+      setErrorMsg('Erro: Cliente de banco de dados não disponível.');
+      return;
+    }
+
+    if (window.confirm('Tem certeza que deseja excluir este relatório permanentemente do banco de dados?')) {
+      try {
+        const { error } = await supabase
+          .from('reports')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        setHistory(history.filter(r => r.id !== id));
+      } catch (err) {
+        console.error('Erro ao deletar:', err);
+        setErrorMsg('Não foi possível excluir o relatório.');
+      }
     }
   };
 
@@ -456,11 +515,15 @@ export default function App() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleSaveReport}
-                    disabled={!reportText}
+                    disabled={!reportText || isSaving}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    {isSaved ? <Check size={16} className="text-emerald-600" /> : <Save size={16} />}
-                    {isSaved ? 'Salvo!' : 'Salvar'}
+                    {isSaving ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      isSaved ? <Check size={16} className="text-emerald-600" /> : <Save size={16} />
+                    )}
+                    {isSaving ? 'Salvando...' : (isSaved ? 'Salvo!' : 'Salvar')}
                   </button>
                   <button
                     onClick={handlePrint}
@@ -546,7 +609,20 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-              {(() => {
+              {!supabase ? (
+                <div className="text-center text-slate-500 py-10 flex flex-col items-center gap-3">
+                  <div className="bg-amber-50 p-4 rounded-full">
+                    <AlertCircle size={24} className="text-amber-600" />
+                  </div>
+                  <p className="font-medium text-amber-800">Banco de dados não configurado</p>
+                  <p className="text-xs px-6">Adicione as variáveis de ambiente Supabase para habilitar o armazenamento em nuvem.</p>
+                </div>
+              ) : isHistoryLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                  <Loader className="animate-spin" size={32} />
+                  <p className="text-sm">Carregando do banco de dados Cloud...</p>
+                </div>
+              ) : (() => {
                 if (selectedStudentForHistory) {
                   const studentReports = history.filter(r => 
                     r.studentName === selectedStudentForHistory &&
