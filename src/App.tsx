@@ -27,9 +27,30 @@ export default function App() {
   const [isSaved, setIsSaved] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recognitionRef = useRef<any>(null);
+
+  // Monitoramento de alterações não salvas para o aviso de saída
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Padrão necessário para navegadores modernos exibirem o aviso
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Sempre que o texto do relatório mudar (via IA ou edição manual), marcamos como não salvo
+  useEffect(() => {
+    if (reportText && !isSaved) {
+      setHasUnsavedChanges(true);
+    }
+  }, [reportText]);
 
   useEffect(() => {
     const saved = localStorage.getItem('reportsHistory');
@@ -182,12 +203,14 @@ export default function App() {
     setHistory(updatedHistory);
     localStorage.setItem('reportsHistory', JSON.stringify(updatedHistory));
     
+    setHasUnsavedChanges(false);
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+    
+    // Opcional: Limpar campos após salvar se desejar (o usuário pediu para excluir o áudio, o que já foi feito)
     setTranscript('');
     setAudioFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
   };
 
   const handleDeleteHistory = (id: string, e: React.MouseEvent) => {
@@ -200,11 +223,18 @@ export default function App() {
   };
 
   const handleLoadHistory = (report: SavedReport) => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('Você tem alterações não salvas no relatório atual. Deseja descartá-las e carregar este registro do histórico?')) {
+        return;
+      }
+    }
     setTranscript('');
     setAudioFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setReportText(report.content);
     setIsHistoryOpen(false);
+    // Como estamos carregando algo já existente, não marcamos como dirty imediatamente
+    setTimeout(() => setHasUnsavedChanges(false), 0);
   };
 
   const handlePrint = () => {
@@ -411,10 +441,17 @@ export default function App() {
             <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6 md:p-8 flex flex-col h-full">
               
               <div className="print:hidden flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <FileText size={24} className="text-emerald-600" />
-                  Relatório Técnico Multiprofissional
-                </h2>
+                <div className="flex flex-col">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <FileText size={24} className="text-emerald-600" />
+                    Relatório Técnico
+                  </h2>
+                  {reportText && (
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-1 w-fit ${hasUnsavedChanges ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {hasUnsavedChanges ? '● Alterações não salvas' : '✓ Salvo no histórico'}
+                    </span>
+                  )}
+                </div>
                 
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -457,12 +494,17 @@ export default function App() {
               </div>
 
               {reportText ? (
-                <textarea 
-                  className="w-full flex-grow min-h-[500px] border-none bg-transparent resize-none outline-none font-serif text-[15px] leading-relaxed text-slate-900 print:text-black focus:ring-0"
-                  value={reportText}
-                  onChange={(e) => setReportText(e.target.value)}
-                  spellCheck={false}
-                />
+                <div className="relative flex-grow flex flex-col">
+                  <div className="print:hidden absolute -top-2 right-0 flex items-center gap-1 text-[10px] text-slate-400 font-medium bg-white px-2 italic">
+                    Clique no texto para editar manualmente
+                  </div>
+                  <textarea 
+                    className="w-full flex-grow min-h-[500px] border-none bg-transparent resize-none outline-none font-serif text-[15px] leading-relaxed text-slate-900 print:text-black focus:ring-0 pt-4"
+                    value={reportText}
+                    onChange={(e) => setReportText(e.target.value)}
+                    spellCheck={false}
+                  />
+                </div>
               ) : (
                 <div className="print:hidden w-full h-full min-h-[400px] flex flex-col items-center justify-center text-slate-400 gap-4 text-center">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
