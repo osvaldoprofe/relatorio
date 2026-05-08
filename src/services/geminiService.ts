@@ -15,7 +15,6 @@ function getAI() {
 
 export async function generateReport(transcript: string, audioData?: { base64: string; mimeType: string }): Promise<string> {
   const ai = getAI();
-  const model = ai.getGenerativeModel({ model: 'gemini-1.5-pro' });
   const prompt = `Você é um assistente especializado em Orientação Educacional e Apoio Pedagógico na Escola Estadual Frederico J. P. Neto.
 Sua tarefa é ler transcrições de relatos verbais enviados pelo orientador, extrair as informações relevantes e preencher o "Relatório Técnico – Equipe Multiprofissional".
 
@@ -72,9 +71,11 @@ ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra 
   contents.push({ text: prompt });
 
   try {
-    const result = await model.generateContent(contents);
-    const response = await result.response;
-    return response.text() || '';
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: contents,
+    });
+    return response.text || '';
   } catch (err) {
     console.error("Gemini Error:", err);
     throw new Error('Falha ao processar o relatório via IA. Verifique sua conexão e tente novamente.');
