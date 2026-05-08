@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+  .replace(/\/$/, "")
+  .replace(/\/rest\/v1$/, ""); // Remove /rest/v1 se o usuário colou a URL da API por engano
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
-// Inicializa apenas se as chaves existirem, evitando o erro "supabaseUrl is required"
-export const supabase = (supabaseUrl && supabaseAnonKey) 
+// Inicializa apenas se as chaves existirem
+export const supabase = (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
