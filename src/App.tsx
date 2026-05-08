@@ -248,9 +248,10 @@ export default function App() {
       setTranscript('');
       setAudioFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar:', err);
-      setErrorMsg('Falha ao salvar no banco de dados Supabase.');
+      const errorMessage = err.message || err.details || 'Falha ao salvar no banco de dados Supabase.';
+      setErrorMsg(`Erro no Banco de Dados: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
