@@ -25,9 +25,10 @@ Diretrizes Gerais:
 - Utilize linguagem formal técnica adequada ao ambiente escolar.
 - Siga exatamente o layout e campos do formulário oficial.
 - Caso alguma informação de identificação não seja dita na transcrição, deixe o campo exatamente como "__________________" para preenchimento manual.
-- NÃO use negritos (**) em excesso, use apenas para os títulos das seções.
+- NÃO use negritos, asteriscos (*) ou qualquer marcação Markdown. O texto deve ser puro e limpo.
+- Siga exatamente o layout e campos do formulário oficial sem decorações de texto.
 
-ESTRUTURA DE SAÍDA (Siga rigorosamente este layout):
+ESTRUTURA DE SAÍDA (Siga rigorosamente este layout e NÃO use asteriscos):
 
 RELATÓRIO TÉCNICO – EQUIPE MULTIPROFISSIONAL
 
@@ -81,7 +82,9 @@ ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra 
       model: 'gemini-3-flash-preview',
       contents: [{ parts }],
     });
-    return response.text || '';
+    const resultText = response.text || '';
+    // Remove todos os asteriscos do relatório para garantir texto limpo
+    return resultText.replace(/\*/g, '');
   } catch (err) {
     console.error("Gemini Error:", err);
     throw new Error('Falha ao processar o relatório via IA. Verifique sua conexão e tente novamente.');
