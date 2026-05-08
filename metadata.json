@@ -1,0 +1,8 @@
+{
+  "name": "Apoio Pedagógico EE Frederico J P Neto",
+  "description": "Gera relatórios técnicos multiprofissionais estruturados a partir de relatos do orientador.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
