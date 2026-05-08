@@ -81,9 +81,10 @@ export default function App() {
         }));
         setHistory(transformed);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar histórico:', err);
-      setErrorMsg('Não foi possível carregar o histórico do banco de dados.');
+      const msg = err.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      setErrorMsg(`Falha ao carregar histórico: ${msg}`);
     } finally {
       setIsHistoryLoading(false);
     }
@@ -250,8 +251,12 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       console.error('Erro ao salvar:', err);
-      const errorMessage = err.message || err.details || 'Falha ao salvar no banco de dados Supabase.';
-      setErrorMsg(`Erro no Banco de Dados: ${errorMessage}`);
+      // Pega o máximo de informação do erro possível
+      const msg = err.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      const details = err.details || '';
+      const hint = err.hint || '';
+      
+      setErrorMsg(`Erro no Banco de Dados: ${msg}. ${details} ${hint}`);
     } finally {
       setIsSaving(false);
     }
@@ -347,7 +352,7 @@ export default function App() {
     });
 
     // Nome do arquivo baseado no estudante
-    const matchName = reportText.match(/Nome do estudante:\s*(.*?)(?=\n|$)/);
+    const matchName = reportText.match(/ESTUDANTE \(A\):\s*(.*?)(?=\s*IDADE:|$|\n)/i);
     let fileName = "Relatorio_Tecnico";
     if (matchName && matchName[1] && matchName[1].trim() !== '__________________') {
       fileName = `Relatorio_${matchName[1].trim().replace(/\s+/g, '_')}`;
