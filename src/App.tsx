@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { Mic, Square, FileText, Copy, Check, Loader2, School, AlertCircle, Trash2, Printer, History, Save, X, Search, Calendar, Upload, FileAudio, ChevronLeft, FileDown, Loader } from 'lucide-react';
 import { generateReport } from './services/geminiService';
 import { jsPDF } from 'jspdf';
 import { supabase } from './lib/supabase';
 
-const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+const SpeechRecognition = null;
 
 interface SavedReport {
   id: string;
@@ -15,8 +15,6 @@ interface SavedReport {
 }
 
 export default function App() {
-  const [transcript, setTranscript] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [reportText, setReportText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -32,8 +30,6 @@ export default function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const recognitionRef = useRef<any>(null);
 
   // Monitoramento de alterações não salvas para o aviso de saída
   useEffect(() => {
@@ -94,58 +90,8 @@ export default function App() {
     loadSupabaseHistory();
   }, []);
 
-  useEffect(() => {
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'pt-BR';
-      
-      recognition.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + ' ';
-          }
-        }
-        if (finalTranscript) {
-          setTranscript((prev) => prev + finalTranscript);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-  }, []);
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      if (!SpeechRecognition) {
-        setErrorMsg('Microfone (voz-para-texto) não suportado pelo seu navegador. Por favor, digite manualmente.');
-        return;
-      }
-      setErrorMsg('');
-      try {
-        recognitionRef.current?.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Remover lógica de reconhecimento de voz
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type.startsWith('audio/')) {
@@ -163,18 +109,13 @@ export default function App() {
   };
 
   const handleGenerateReport = async () => {
-    if (!transcript.trim() && !audioFile) {
-      setErrorMsg('Por favor, informe um relato, grave o áudio ou faça upload de um arquivo de áudio antes de gerar o relatório.');
+    if (!audioFile) {
+      setErrorMsg('Por favor, faça upload de um arquivo de áudio para gerar o relatório.');
       return;
     }
     setErrorMsg('');
     setIsGenerating(true);
     try {
-      if (isRecording) {
-        recognitionRef.current?.stop();
-        setIsRecording(false);
-      }
-      
       let audioData;
       if (audioFile) {
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -189,7 +130,7 @@ export default function App() {
         audioData = { base64, mimeType: audioFile.type || 'audio/mp3' };
       }
 
-      const data = await generateReport(transcript, audioData);
+      const data = await generateReport('', audioData);
       setReportText(data);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao comunicar com a IA.');
@@ -246,7 +187,6 @@ export default function App() {
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
       
-      setTranscript('');
       setAudioFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
@@ -262,7 +202,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteHistory = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteHistory = async (id: string, e: MouseEvent) => {
     e.stopPropagation();
     
     if (!supabase) {
@@ -293,7 +233,6 @@ export default function App() {
         return;
       }
     }
-    setTranscript('');
     setAudioFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setReportText(report.content);
@@ -372,8 +311,8 @@ export default function App() {
               <School size={48} className="text-emerald-100" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Escola Estadual Frederico J. P. Neto</h1>
-              <p className="text-emerald-100 mt-2 text-lg">Sistema de Apoio Pedagógico e Orientação Educacional</p>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gerador de Relatórios</h1>
+              <p className="text-emerald-100 mt-2 text-lg">Escola Estadual Frederico J. P. Neto</p>
             </div>
           </div>
           <button
@@ -399,51 +338,58 @@ export default function App() {
           
           {/* Seção Esquerda: Entrada de Dados - Oculta na impressão */}
           <div className="print:hidden lg:col-span-5 flex flex-col gap-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-emerald-50/50 via-white to-white">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
-                  <Mic size={20} className="text-emerald-600" />
-                  Relato do Atendimento
+                  <FileAudio size={20} className="text-emerald-600" />
+                  Upload do Relato Oral
                 </h2>
-                {transcript && (
-                  <button 
-                    onClick={() => setTranscript('')} 
-                    className="text-slate-400 hover:text-red-500 transition-colors"
-                    title="Limpar texto"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
               </div>
 
-              <p className="text-sm text-slate-500 mb-4">
-                Grave via microfone, faça upload de um áudio salvo, ou cole as anotações do atendimento para converter no formulário técnico oficial.
+              <p className="text-sm text-slate-500 mb-6">
+                Faça o upload do arquivo de áudio com o relato do atendimento. A IA irá transcrever e organizar as informações automaticamente no padrão oficial da Escola Estadual Frederico J. P. Neto.
               </p>
 
-              <textarea
-                className="w-full flex-grow min-h-[200px] p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none text-slate-700 mb-4"
-                placeholder="Exemplo: Atendi a Yasmin do 7º ano tarde, que estava muito agitada em sala..."
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-              />
-
-              {audioFile && (
-                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl mb-4">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <FileAudio size={20} className="text-emerald-600 shrink-0" />
-                    <span className="text-sm font-medium text-emerald-800 truncate" title={audioFile.name}>
-                      {audioFile.name}
-                    </span>
+              <div className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-8 bg-slate-50/50 transition-colors hover:bg-slate-50 mb-6"
+                   onDragOver={(e) => e.preventDefault()}
+                   onDrop={(e) => {
+                     e.preventDefault();
+                     const file = e.dataTransfer.files?.[0];
+                     if (file && file.type.startsWith('audio/')) {
+                       setAudioFile(file);
+                       setErrorMsg('');
+                     }
+                   }}
+              >
+                {audioFile ? (
+                  <div className="w-full space-y-4">
+                    <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
+                      <div className="bg-emerald-100 p-3 rounded-lg">
+                        <FileAudio size={24} className="text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-700 truncate">{audioFile.name}</p>
+                        <p className="text-xs text-slate-400">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                      </div>
+                      <button
+                        onClick={handleRemoveAudio}
+                        className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                        title="Remover arquivo"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleRemoveAudio}
-                    className="p-1 hover:bg-emerald-100 rounded-full text-emerald-600 transition-colors"
-                    title="Remover áudio"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-slate-100">
+                      <Upload size={28} className="text-slate-400" />
+                    </div>
+                    <p className="text-slate-600 font-medium mb-1">Arraste seu áudio aqui</p>
+                    <p className="text-slate-400 text-xs">ou clique no botão abaixo para selecionar</p>
+                  </div>
+                )}
+              </div>
 
               <input
                 type="file"
@@ -453,47 +399,28 @@ export default function App() {
                 onChange={handleFileUpload}
               />
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all flex-1 bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200"
-                >
-                  <Upload size={18} /> Upload de Áudio
-                </button>
+              <div className="flex flex-col gap-3">
+                {!audioFile && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold transition-all bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 shadow-sm"
+                  >
+                    <Upload size={20} /> Selecionar Arquivo de Áudio
+                  </button>
+                )}
 
-                <button
-                  onClick={toggleRecording}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all flex-1 ${
-                    isRecording 
-                      ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                      : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-                  }`}
-                >
-                  {isRecording ? (
-                    <>
-                      <Square size={18} className="animate-pulse fill-current" /> Parando...
-                    </>
-                  ) : (
-                    <>
-                      <Mic size={18} /> Gravar Áudio
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
                 <button
                   onClick={handleGenerateReport}
-                  disabled={isGenerating || (!transcript.trim() && !audioFile)}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-white transition-all bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  disabled={isGenerating || !audioFile}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold text-white transition-all bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg mt-2"
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" /> Processando...
+                      <Loader2 size={20} className="animate-spin" /> Processando Relatório...
                     </>
                   ) : (
                     <>
-                      <FileText size={18} /> Gerar Relatório
+                      <FileText size={20} /> Transcrever e Gerar Relatório
                     </>
                   )}
                 </button>
