@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, FileText, Copy, Check, Loader2, School, AlertCircle, Trash2, Printer, History, Save, X, Search, Calendar, Upload, FileAudio, ChevronLeft } from 'lucide-react';
+import { Mic, Square, FileText, Copy, Check, Loader2, School, AlertCircle, Trash2, Printer, History, Save, X, Search, Calendar, Upload, FileAudio, ChevronLeft, FileDown } from 'lucide-react';
 import { generateReport } from './services/geminiService';
+import { jsPDF } from 'jspdf';
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -210,6 +211,61 @@ export default function App() {
     window.print();
   };
 
+  const handleExportPDF = () => {
+    if (!reportText) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxLineWidth = pageWidth - margin * 2;
+
+    // Cabeçalho
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("ESCOLA ESTADUAL FREDERICO J. P. NETO", pageWidth / 2, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text("RELATÓRIO TÉCNICO – EQUIPE MULTIPROFISSIONAL", pageWidth / 2, 30, { align: "center" });
+    
+    doc.setLineWidth(0.5);
+    doc.line(margin, 35, pageWidth - margin, 35);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    // Processar o texto para o PDF
+    const lines = doc.splitTextToSize(reportText, maxLineWidth);
+    let y = 45;
+    const lineHeight = 7;
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    lines.forEach((line: string) => {
+      // Verificar se o texto é um título de seção (ex: I - IDENTIFICAÇÃO)
+      if (/^[I|V|X]+ – /.test(line) || /^[V]+ – /.test(line)) {
+        doc.setFont("helvetica", "bold");
+      } else {
+        doc.setFont("helvetica", "normal");
+      }
+
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+
+    // Nome do arquivo baseado no estudante
+    const matchName = reportText.match(/Nome do estudante:\s*(.*?)(?=\n|$)/);
+    let fileName = "Relatorio_Tecnico";
+    if (matchName && matchName[1] && matchName[1].trim() !== '__________________') {
+      fileName = `Relatorio_${matchName[1].trim().replace(/\s+/g, '_')}`;
+    }
+    
+    doc.save(`${fileName}.pdf`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -377,6 +433,13 @@ export default function App() {
                     <Printer size={16} /> Imprimir
                   </button>
                   <button
+                    onClick={handleExportPDF}
+                    disabled={!reportText}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <FileDown size={16} /> Exportar PDF
+                  </button>
+                  <button
                     onClick={handleCopy}
                     disabled={!reportText}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
@@ -443,49 +506,60 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
               {(() => {
                 if (selectedStudentForHistory) {
-                  const studentReports = history.filter(r => r.studentName === selectedStudentForHistory);
-                  if (studentReports.length === 0) {
-                    setSelectedStudentForHistory(null);
-                    return null;
-                  }
+                  const studentReports = history.filter(r => 
+                    r.studentName === selectedStudentForHistory &&
+                    (r.content.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                     new Date(r.date).toLocaleDateString('pt-BR').includes(searchTerm))
+                  );
+                  
                   return (
                     <>
-                      <div className="flex items-center gap-2 mb-4 p-2 bg-slate-200/50 rounded-lg">
+                      <div className="flex items-center gap-3 mb-4 p-2 bg-emerald-50 rounded-xl border border-emerald-100">
                         <button 
-                          onClick={() => setSelectedStudentForHistory(null)} 
-                          className="p-1.5 hover:bg-slate-300/50 rounded-lg text-slate-700 transition-colors"
+                          onClick={() => {
+                            setSelectedStudentForHistory(null);
+                            setSearchTerm('');
+                          }} 
+                          className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold shadow-sm transition-colors border border-emerald-200"
                         >
-                          <ChevronLeft size={20} />
+                          <ChevronLeft size={16} /> Voltar
                         </button>
-                        <div className="font-bold text-slate-800 flex-1 truncate leading-tight">
+                        <div className="font-bold text-emerald-900 flex-1 truncate text-sm">
                           {selectedStudentForHistory}
                         </div>
                       </div>
-                      {studentReports.map((report) => (
-                        <div 
-                          key={report.id}
-                          onClick={() => handleLoadHistory(report)}
-                          className="p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-500 hover:shadow-md cursor-pointer transition-all group relative"
-                        >
-                          <button 
-                            onClick={(e) => handleDeleteHistory(report.id, e)}
-                            className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
-                            title="Excluir"
+                      
+                      {studentReports.length > 0 ? (
+                        studentReports.map((report) => (
+                          <div 
+                            key={report.id}
+                            onClick={() => handleLoadHistory(report)}
+                            className="p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-500 hover:shadow-md cursor-pointer transition-all group relative"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                          
-                          <div className="text-sm text-slate-500 flex flex-col gap-1.5 pr-8">
-                            <span className="flex items-center gap-1.5 font-bold text-slate-700">
-                              <Calendar size={14} className="text-emerald-600" /> 
-                              {new Date(report.date).toLocaleDateString('pt-BR')} às {new Date(report.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
-                            </span>
-                            <span className="text-xs text-slate-400 line-clamp-2 mt-1">
-                              {report.content.substring(0, 120)}...
-                            </span>
+                            <button 
+                              onClick={(e) => handleDeleteHistory(report.id, e)}
+                              className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
+                              title="Excluir"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                            
+                            <div className="text-sm text-slate-500 flex flex-col gap-1.5 pr-8">
+                              <span className="flex items-center gap-1.5 font-bold text-slate-700">
+                                <Calendar size={14} className="text-emerald-600" /> 
+                                {new Date(report.date).toLocaleDateString('pt-BR')} às {new Date(report.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                              <span className="text-xs text-slate-400 line-clamp-2 mt-1">
+                                {report.content.substring(0, 150).replace(/[#*]/g, '')}...
+                              </span>
+                            </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-slate-500 py-10 text-sm italic">
+                          Nenhum registro encontrado para este critério.
                         </div>
-                      ))}
+                      )}
                     </>
                   );
                 }
