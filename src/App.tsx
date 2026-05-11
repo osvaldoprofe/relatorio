@@ -94,11 +94,12 @@ export default function App() {
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type.startsWith('audio/')) {
+      // Aceita audio/* (abrangendo mp3, wav, etc) e video/mp4
+      if (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3')) {
         setAudioFile(file);
         setErrorMsg('');
       } else {
-        setErrorMsg('Por favor, selecione um arquivo de áudio válido.');
+        setErrorMsg('Por favor, selecione um arquivo de áudio (MP3, WAV) ou vídeo MP4 válido.');
       }
     }
   };
@@ -355,7 +356,7 @@ export default function App() {
                    onDrop={(e) => {
                      e.preventDefault();
                      const file = e.dataTransfer.files?.[0];
-                     if (file && file.type.startsWith('audio/')) {
+                     if (file && (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3'))) {
                        setAudioFile(file);
                        setErrorMsg('');
                      }
@@ -385,7 +386,7 @@ export default function App() {
                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-slate-100">
                       <Upload size={28} className="text-slate-400" />
                     </div>
-                    <p className="text-slate-600 font-medium mb-1">Arraste seu áudio aqui</p>
+                    <p className="text-slate-600 font-medium mb-1">Arraste seu áudio (MP3) ou MP4 aqui</p>
                     <p className="text-slate-400 text-xs">ou clique no botão abaixo para selecionar</p>
                   </div>
                 )}
@@ -393,7 +394,7 @@ export default function App() {
 
               <input
                 type="file"
-                accept="audio/*"
+                accept="audio/mp3,audio/mpeg,audio/*,video/mp4"
                 className="hidden"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
@@ -628,7 +629,7 @@ export default function App() {
                   return acc;
                 }, {} as Record<string, { studentName: string, studentClass: string, reports: SavedReport[] }>);
 
-                const filteredStudents = Object.values(groupedHistory).filter(group => 
+                const filteredStudents = Object.values(groupedHistory).filter((group: any) => 
                   group.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   group.studentClass.toLowerCase().includes(searchTerm.toLowerCase())
                 );
@@ -650,7 +651,7 @@ export default function App() {
                   );
                 }
 
-                return filteredStudents.map((group) => (
+                return filteredStudents.map((group: any) => (
                   <div 
                     key={group.studentName}
                     onClick={() => setSelectedStudentForHistory(group.studentName)}
