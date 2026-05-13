@@ -79,14 +79,17 @@ ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash',
       contents: [{ parts }],
     });
     const resultText = response.text || '';
     // Remove todos os asteriscos do relatório para garantir texto limpo
     return resultText.replace(/\*/g, '');
-  } catch (err) {
+  } catch (err: any) {
     console.error("Gemini Error:", err);
-    throw new Error('Falha ao processar o relatório via IA. Verifique sua conexão e tente novamente.');
+    const apiError = err?.response?.candidates?.[0]?.finishReason === 'SAFETY' 
+      ? 'O conteúdo foi bloqueado pelos filtros de segurança da IA.' 
+      : (err.message || 'Falha ao processar o relatório via IA.');
+    throw new Error(apiError);
   }
 }

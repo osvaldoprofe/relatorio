@@ -95,11 +95,11 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file) {
       // Aceita audio/* (abrangendo mp3, wav, etc) e video/mp4
-      if (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3')) {
+      if (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3') || file.name.toLowerCase().endsWith('.mp4')) {
         setAudioFile(file);
         setErrorMsg('');
       } else {
-        setErrorMsg('Por favor, selecione um arquivo de áudio (MP3, WAV) ou vídeo MP4 válido.');
+        setErrorMsg('Por favor, selecione um arquivo de áudio (MP3, WAV) ou MP4 válido.');
       }
     }
   };
@@ -128,12 +128,22 @@ export default function App() {
           reader.onerror = reject;
           reader.readAsDataURL(audioFile);
         });
-        audioData = { base64, mimeType: audioFile.type || 'audio/mp3' };
+        
+        let mimeType = audioFile.type;
+        if (!mimeType) {
+          if (audioFile.name.toLowerCase().endsWith('.mp3')) mimeType = 'audio/mp3';
+          else if (audioFile.name.toLowerCase().endsWith('.mp4')) mimeType = 'video/mp4';
+          else if (audioFile.name.toLowerCase().endsWith('.wav')) mimeType = 'audio/wav';
+          else mimeType = 'audio/mp3'; // fallback
+        }
+        
+        audioData = { base64, mimeType };
       }
 
       const data = await generateReport('', audioData);
       setReportText(data);
     } catch (err: any) {
+      console.error('Erro detalhado:', err);
       setErrorMsg(err.message || 'Erro ao comunicar com a IA.');
     } finally {
       setIsGenerating(false);
@@ -356,7 +366,7 @@ export default function App() {
                    onDrop={(e) => {
                      e.preventDefault();
                      const file = e.dataTransfer.files?.[0];
-                     if (file && (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3'))) {
+                     if (file && (file.type.startsWith('audio/') || file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp3') || file.name.toLowerCase().endsWith('.mp4'))) {
                        setAudioFile(file);
                        setErrorMsg('');
                      }
@@ -386,8 +396,8 @@ export default function App() {
                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-slate-100">
                       <Upload size={28} className="text-slate-400" />
                     </div>
-                    <p className="text-slate-600 font-medium mb-1">Arraste seu áudio (MP3) ou MP4 aqui</p>
-                    <p className="text-slate-400 text-xs">ou clique no botão abaixo para selecionar</p>
+                    <p className="text-slate-600 font-medium mb-1">Arraste seu áudio ou MP4 aqui</p>
+                    <p className="text-slate-400 text-xs">Suporta MP3, WAV e MP4</p>
                   </div>
                 )}
               </div>
