@@ -8,7 +8,14 @@ function getAI() {
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
       throw new Error('Chave de API do Gemini não encontrada. Configure a variável GEMINI_API_KEY no ambiente.');
     }
-    genAI = new GoogleGenAI({ apiKey });
+    genAI = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
   return genAI;
 }
@@ -79,7 +86,7 @@ ${transcript.trim() ? transcript : (audioData ? "O relato principal se encontra 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts }],
     });
     const resultText = response.text || '';
