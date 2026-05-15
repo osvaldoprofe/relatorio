@@ -130,9 +130,15 @@ export default function App() {
         });
         
         let mimeType = audioFile.type;
+        // Se for um arquivo MP4, preferimos tratar como audio/mp4 para evitar erros de "0 frames"
+        // quando o arquivo é apenas áudio dentro de um container mp4 (comum em gravações).
+        if (mimeType === 'video/mp4') {
+          mimeType = 'audio/mp4';
+        }
+
         if (!mimeType) {
           if (audioFile.name.toLowerCase().endsWith('.mp3')) mimeType = 'audio/mp3';
-          else if (audioFile.name.toLowerCase().endsWith('.mp4')) mimeType = 'video/mp4';
+          else if (audioFile.name.toLowerCase().endsWith('.mp4')) mimeType = 'audio/mp4';
           else if (audioFile.name.toLowerCase().endsWith('.wav')) mimeType = 'audio/wav';
           else mimeType = 'audio/mp3'; // fallback
         }
